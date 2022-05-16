@@ -1,7 +1,5 @@
 import pandas as pd
-import numpy as np
 import xml.etree.ElementTree as et
-from pathlib import Path
 import os
 
 class DataParsing:
@@ -22,40 +20,40 @@ class DataParsing:
         objectPose = []
         objectTruncated = []
         difficult = []
-        # the value here would be a point of (xmin,ymin) (xmax, ymax)
-
         bndbox = []
 
         path_of_the_directory = '../Data/annotated-images/'
-        # paths = Path(path_of_the_directory).glob('img-*/*.xml')
-        # print(paths)
-        ext = ('.xml')
-        for files in os.scandir(path_of_the_directory):
-            if files.path.endswith(ext):
 
-                print(files)
-                print(files.path)
-                root = self.parse_XML(files.path)
-                self.render_node_columns_by_name(root, "folder", fileName)
-                self.render_node_columns_by_name(root, "path", path)
-                self.render_node_columns_by_name(root, "source", source)
+        extension = ('.xml')
 
-                size_node = self.render_node_by_elment(root, "size")
+        self.rename_files(path_of_the_directory, extension)
 
-                self.render_node_columns_by_name(size_node, "width", width)
-                self.render_node_columns_by_name(size_node, "height", height)
-                self.render_node_columns_by_name(size_node, "depth", depth)
+        for subdir, dirs, files in os.walk(path_of_the_directory):
+            for name in files:
 
-                self.render_node_columns_by_name(root, "segmented",segmented)
+                if name.endswith(extension):
+                    root = self.parse_XML(subdir+name)
 
-                object_node = self.render_node_by_elment(root, "object")
+                    fileName.append(name)
+                    self.render_node_columns_by_name(root, "path", path)
+                    self.render_node_columns_by_name(root, "source", source)
 
-                self.render_node_columns_by_name(object_node, "name", objectName)
-                self.render_node_columns_by_name(object_node, "pose", objectPose)
-                self.render_node_columns_by_name(object_node, "truncated", objectTruncated)
-                self.render_node_columns_by_name(object_node, "difficult", difficult)
+                    size_node = self.render_node_by_elment(root, "size")
 
-                self.render_node_columns_by_name(root, "bndbox", bndbox)
+                    self.render_node_columns_by_name(size_node, "width", width)
+                    self.render_node_columns_by_name(size_node, "height", height)
+                    self.render_node_columns_by_name(size_node, "depth", depth)
+
+                    self.render_node_columns_by_name(root, "segmented",segmented)
+
+                    object_node = self.render_node_by_elment(root, "object")
+
+                    self.render_node_columns_by_name(object_node, "name", objectName)
+                    self.render_node_columns_by_name(object_node, "pose", objectPose)
+                    self.render_node_columns_by_name(object_node, "truncated", objectTruncated)
+                    self.render_node_columns_by_name(object_node, "difficult", difficult)
+
+                    self.render_bndbox(root, "bndbox", bndbox)
 
 
         df = pd.DataFrame(list(
@@ -64,6 +62,8 @@ class DataParsing:
             columns=['FILE_NAME', 'PATH', 'SOURCE', 'WIDTH', 'HEIGHT', 'DEPTH', 'SEGMENTED', 'OBJECT_NAME',
                      'OBJECT_POSE', 'OBJECT_TRUNCATED', 'DIFFICULT', 'BND_BOX']
         )
+
+        df.sort_values(by=['FILE_NAME'], inplace=True)
         self.set_df(df)
         self.create_csv(df)
 
@@ -73,7 +73,15 @@ class DataParsing:
         root = tree.getroot()
         return root
 
-
+    def rename_files(self, path_of_the_directory, extension):
+        for subdir, dirs, files in os.walk(path_of_the_directory):
+            for name in files:
+                if name.endswith(extension):
+                    file_x = name.split('img-')[1].split('.')[0]
+                    new_format = "{:03d}".format(int(file_x))
+                    old_file = os.path.join(subdir, name)
+                    new_file = os.path.join(subdir, "img-"+ new_format + ".xml")
+                    os.rename(old_file, new_file)
 
     def get_df(self):
         return self.Data_df
@@ -87,8 +95,6 @@ class DataParsing:
 
     def render_node_columns_by_name(self, root, node, column):
         for elm in root.iter(node):
-            # print(elm.text)
-            # print("name")
             column.append(elm.text)
 
     def render_node_by_elment(self, parent, node):
@@ -96,12 +102,11 @@ class DataParsing:
 
     def render_bndbox(self, parent, node, column):
         for elm in parent.iter(node):
-
             xmin = elm.find("xmin","").text
             ymin = elm.find("ymin", "").text
             xmax = elm.find("xmax", "").text
             ymax = elm.find("ymax", "").text
-            column.append(xmin + ',' + ymin + "," + xmax + "," + ymax)
+            column.append("("+xmin + ',' + ymin + "),(" + xmax + "," + ymax+")")
 
 
 def main():
