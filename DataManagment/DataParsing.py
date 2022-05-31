@@ -1,6 +1,7 @@
 import pandas as pd
 import xml.etree.ElementTree as et
 import os
+import json
 
 class DataParsing:
 
@@ -53,7 +54,8 @@ class DataParsing:
                     self.render_node_columns_by_name(object_node, "truncated", objectTruncated)
                     self.render_node_columns_by_name(object_node, "difficult", difficult)
 
-                    self.render_bndbox(root, "bndbox", bndbox)
+                    self.render_region(root, "object", bndbox)
+                    # self.render_bndbox(root, "bndbox", bndbox)
 
 
         df = pd.DataFrame(list(
@@ -106,7 +108,24 @@ class DataParsing:
             ymin = elm.find("ymin", "").text
             xmax = elm.find("xmax", "").text
             ymax = elm.find("ymax", "").text
-            column.append("("+xmin + ',' + ymin + "),(" + xmax + "," + ymax+")")
+            column.append("(" + xmin + ',' + ymin + "),(" + xmax + "," + ymax + ")")
+
+    def render_region(self, parent, node, column):
+        obj_index =0
+        obj = {}
+        for elm in parent.iter(node):
+            for region in elm.iter("bndbox"):
+                xmin = region.find("xmin").text
+                ymin = region.find("ymin").text
+                xmax = region.find("xmax").text
+                ymax = region.find("ymax").text
+                i = str(obj_index)
+                obj[obj_index] = {"shape_attributes": {"name": "reg#" + str(obj_index), "all_points_x": [xmin, xmax], "all_points_y": [ymin, ymax]}}
+                # shape_attribute = {"shape_attributes": {"all_points_x": [xmin, xmax], "all_points_y": [ymin, ymax]}}
+            obj_index = obj_index+1
+        reg = {"region": obj}
+        # reg_col = json.dumps(reg)
+        column.append(reg)
 
 
 def main():
